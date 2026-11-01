@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F分布交互演示器</title>
+<style>
+body{font-family:"Microsoft YaHei",Arial,sans-serif;margin:20px;color:#202637}main{max-width:950px;margin:auto}h2{text-align:center}
+canvas{width:100%;height:390px;border:1px solid #e3e7ef;border-radius:12px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+section{background:#f6f8fc;border:1px solid #e3e7ef;border-radius:12px;padding:16px}
+input{width:100%;accent-color:#4268f5}output{float:right;color:#4268f5;font-weight:bold;font-size:20px}
+.stats{grid-column:1/-1;display:flex;justify-content:space-around;flex-wrap:wrap}
+small{color:#687386}.note{color:#687386;font-size:13px;line-height:1.6}
+@media(max-width:600px){.controls{grid-template-columns:1fr}.stats{grid-column:auto}}
+</style>
+<main><h2>F分布交互演示器</h2><p style="text-align:center;color:#687386">拖动滑块，观察分子、分母自由度变化对F分布曲线的影响</p>
+<canvas id="c"></canvas>
+<div class="controls">
+<section><b>分子自由度 df₁</b><output id="o1">5</output><input id="d1" type="range" min="1" max="50" value="5"><small>1 — 50</small></section>
+<section><b>分母自由度 df₂</b><output id="o2">2</output><input id="d2" type="range" min="1" max="50" value="2"><small>1 — 50</small></section>
+<section style="grid-column:1/-1"><b>观察F值</b><output id="of">2.92</output><input id="fv" type="range" min=".1" max="5" step=".01" value="2.92"><small>橙色竖线右侧阴影为右尾概率 p</small></section>
+<section class="stats"><div><small>自由度组合</small><br><b id="pair">F(5, 2)</b></div><div><small>观察F值</small><br><b id="fnum">2.92</b></div><div><small>右尾概率 p</small><br><b id="pv">计算中</b></div></section>
+</div><p class="note" id="note">初始参数对应教材案例：F(5,2)，观察F值为2.92。曲线右侧阴影面积表示 p 值。</p></main>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),d1=document.getElementById('d1'),d2=document.getElementById('d2'),fv=document.getElementById('fv');
+function lg(z){const p=[676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];if(z<.5)return Math.log(Math.PI)-Math.log(Math.sin(Math.PI*z))-lg(1-z);z--;let x=.99999999999980993;for(let i=0;i<p.length;i++)x+=p[i]/(z+i+1);let t=z+p.length-.5;return .5*Math.log(2*Math.PI)+(z+.5)*Math.log(t)-t+Math.log(x)}
+function cf(a,b,x){let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap,h;d=1/d;h=d;for(let m=1;m<=200;m++){let m2=2*m,aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;c=1+aa/c;d=1/d;h*=d*c;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;c=1+aa/c;d=1/d;let del=d*c;h*=del;if(Math.abs(del-1)<3e-14)break}return h}
+function ib(x,a,b){if(x<=0)return 0;if(x>=1)return 1;let bt=Math.exp(lg(a+b)-lg(a)-lg(b)+a*Math.log(x)+b*Math.log1p(-x));return x<(a+1)/(a+b+2)?bt*cf(a,b,x)/a:1-bt*cf(b,a,1-x)/b}
+function pdf(x,a,b){if(x<=0)return 0;let A=a/2,B=b/2;return Math.exp(A*Math.log(a/b)+(A-1)*Math.log(x)-(A+B)*Math.log1p(a*x/b)-(lg(A)+lg(B)-lg(A+B)))}
+function tail(x,a,b){return ib(b/(b+a*x),b/2,a/2)}
+function draw(){let a=+d1.value,b=+d2.value,z=+fv.value;document.getElementById('o1').textContent=a;document.getElementById('o2').textContent=b;document.getElementById('of').textContent=z.toFixed(2);document.getElementById('pair').textContent=`F(${a}, ${b})`;document.getElementById('fnum').textContent=z.toFixed(2);let p=tail(z,a,b);document.getElementById('pv').textContent=p.toFixed(4);document.getElementById('note').textContent=`橙色竖线表示 F=${z.toFixed(2)}，其右侧阴影面积为 p=${p.toFixed(4)}。${b<=2?' df₂≤2 时，F分布的理论均值不存在。':''}`;
+let r=c.getBoundingClientRect(),D=devicePixelRatio||1;c.width=r.width*D;c.height=390*D;ctx.setTransform(D,0,0,D,0,0);let W=r.width,H=390,L=55,R=18,T=18,B=42,pw=W-L-R,ph=H-T-B,X=x=>L+x/5*pw;
+let arr=[],ym=0;for(let i=0;i<=900;i++){let x=.001+4.999*i/900,y=pdf(x,a,b);arr.push([x,y]);ym=Math.max(ym,y)}ym=Math.min(2,Math.max(.2,ym*1.12));let Y=y=>T+ph-y/ym*ph;
+ctx.clearRect(0,0,W,H);ctx.font='12px Arial';ctx.fillStyle='#667085';ctx.strokeStyle='#e7ebf2';
+for(let i=0;i<=5;i++){ctx.beginPath();ctx.moveTo(X(i),T);ctx.lineTo(X(i),T+ph);ctx.stroke();ctx.textAlign='center';ctx.fillText(i,X(i),H-15)}
+for(let i=0;i<=4;i++){let y=ym*i/4;ctx.beginPath();ctx.moveTo(L,Y(y));ctx.lineTo(W-R,Y(y));ctx.stroke();ctx.textAlign='right';ctx.fillText(y.toFixed(2),L-8,Y(y)+4)}
+ctx.beginPath();ctx.moveTo(X(z),Y(0));arr.forEach(([x,y])=>{if(x>=z)ctx.lineTo(X(x),Y(Math.min(y,ym)))});ctx.lineTo(X(5),Y(0));ctx.closePath();ctx.fillStyle='rgba(217,119,6,.22)';ctx.fill();
+ctx.beginPath();arr.forEach(([x,y],i)=>i?ctx.lineTo(X(x),Y(Math.min(y,ym))):ctx.moveTo(X(x),Y(Math.min(y,ym))));ctx.strokeStyle='#4268f5';ctx.lineWidth=3;ctx.stroke();
+ctx.setLineDash([5,5]);ctx.strokeStyle='#9aa3b2';ctx.beginPath();ctx.moveTo(X(1),T);ctx.lineTo(X(1),T+ph);ctx.stroke();ctx.strokeStyle='#d97706';ctx.beginPath();ctx.moveTo(X(z),T);ctx.lineTo(X(z),T+ph);ctx.stroke();ctx.setLineDash([]);
+ctx.fillStyle='#263244';ctx.font='13px Arial';ctx.textAlign='center';ctx.fillText('F Value',L+pw/2,H-2);ctx.save();ctx.translate(15,T+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText('Density',0,0);ctx.restore()}
+[d1,d2,fv].forEach(e=>e.addEventListener('input',draw));window.addEventListener('resize',draw);draw();
+</script>
